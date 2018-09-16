@@ -15,7 +15,7 @@ from RosInterface import ROSInterface
 # User files, uncomment as completed
 #from MyShortestPath import my_dijkstras
 #from KalmanFilter import KalmanFilter
-#from DiffDriveController import DiffDriveController
+from DiffDriveController import DiffDriveController
 
 class RobotControl(object):
     """
@@ -34,7 +34,7 @@ class RobotControl(object):
         
         # Uncomment as completed
         #self.kalman_filter = KalmanFilter(world_map)
-        #self.diff_drive_controller = DiffDriveController(max_speed, max_omega)
+        self.diff_drive_controller = DiffDriveController(max_speed, max_omega)
 
     def process_measurements(self):
         """ 
@@ -43,8 +43,31 @@ class RobotControl(object):
         """
         meas = self.ros_interface.get_measurements()
         imu_meas = self.ros_interface.get_imu()
+        #print(meas)
 
-        self.ros_interface.command_velocity(0.3, 0.5)
+        done = False
+        #print("time = " + str(self.robot_sim.last_meas_time))
+        if meas is not None and meas != []:
+            print "meas = " + str(meas[0][0:3])
+            #print type(meas)
+            state = -np.array(meas[0][0:3])
+            goal = np.array([0, 0])
+            print "state = " + str(state)
+            #print type(state)
+            #print goal
+            #print type(goal)
+            v, omega, done = self.diff_drive_controller.compute_vel(state, goal)
+            #print done
+            #self.robot_sim.command_velocity(v, omega)
+            self.ros_interface.command_velocity(v, omega)
+        else:
+            #print "No measurement"
+            #self.robot_sim.command_velocity(0, 0)
+            v = 0
+            omega = 0
+            self.ros_interface.command_velocity(v, omega)
+        print "v = " + str(v)
+        print "omega = " + str(omega)
         
         return
     
@@ -71,10 +94,18 @@ def main(args):
     robotControl = RobotControl(world_map,occupancy_map, pos_init, pos_goal, max_vel, max_omega, x_spacing, y_spacing, t_cam_to_body)
 
     # Call process_measurements at 60Hz
-    r = rospy.Rate(60)
+    r = rospy.Rate(1)
+    #time = rospy.get_time() # used for calibration
     while not rospy.is_shutdown():
         robotControl.process_measurements()
+	# Calibration
+	# command robot forward at 0.3 m/s for 1 sec and measure how far it travels
+	#if rospy.get_time() - time < 1:
+	   #robotControl.ros_interface.command_velocity(0.3,0)
+	#else:
+	    #robotControl.ros_interface.command_velocity(0,0)
         r.sleep()
+
     # Done, stop robot
     robotControl.ros_interface.command_velocity(0,0)
 
