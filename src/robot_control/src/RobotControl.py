@@ -14,7 +14,7 @@ from RosInterface import ROSInterface
 
 # User files, uncomment as completed
 #from MyShortestPath import my_dijkstras
-#from KalmanFilter import KalmanFilter
+from KalmanFilter import KalmanFilter
 from DiffDriveController import DiffDriveController
 
 class RobotControl(object):
@@ -33,43 +33,53 @@ class RobotControl(object):
         # YOUR CODE AFTER THIS
         
         # Uncomment as completed
-        #self.kalman_filter = KalmanFilter(world_map)
+        self.kalman_filter = KalmanFilter(world_map, pos_init.flatten())
         self.diff_drive_controller = DiffDriveController(max_speed, max_omega)
+        self.v_last = 0.0
+        self.omega_last = 0.0
+        self.goal = pos_goal
 
     def process_measurements(self):
         """ 
         YOUR CODE HERE
         This function is called at 60Hz
         """
-        meas = self.ros_interface.get_measurements()
+        # tag wrt robot in robot frame - (Nx4) np array (x,y,theta,id)
+        meas = np.array(self.ros_interface.get_measurements())
+        # (5,1) np array (xacc,yacc,zacc,omega,time)
         imu_meas = self.ros_interface.get_imu()
-        #print(meas)
+        print "meas = ", meas
+        #print("type(meas) = " + str(type(meas)))
+        print "imu_meas = ", imu_meas
 
-        done = False
+        #done = False
         #print("time = " + str(self.robot_sim.last_meas_time))
-        if meas is not None and meas != []:
-            print "meas = " + str(meas[0][0:3])
-            #print type(meas)
-            state = -np.array(meas[0][0:3])
-            goal = np.array([0, 0])
-            print "state = " + str(state)
-            #print type(state)
-            #print goal
-            #print type(goal)
-            v, omega, done = self.diff_drive_controller.compute_vel(state, goal)
-            #print done
-            #self.robot_sim.command_velocity(v, omega)
-            self.ros_interface.command_velocity(v, omega)
-        else:
-            #print "No measurement"
-            #self.robot_sim.command_velocity(0, 0)
-            v = 0
-            omega = 0
-            self.ros_interface.command_velocity(v, omega)
-        print "v = " + str(v)
-        print "omega = " + str(omega)
+        #if meas is not None and meas != []:
+            #z_t = meas[:,:-1] # if meas is a np array, then access elements with tuple
+
+        #else:
+            #z_t = meas
+        print "v_last (process_measurements) = ", self.v_last
+        print "omega_last (process_measurements) = ", self.omega_last
+
+        state = self.kalman_filter.step_filter(self.v_last, self.omega_last, imu_meas, np.array(meas))
+        print "state = ", state
+        print "goal = ", self.goal
         
-        return
+        done = False
+        if meas is not None:
+            v, omega, done = self.diff_drive_controller.compute_vel(state, self.goal)
+            print "v (compute_vel) = ", v
+            print "omega (compute_vel) = ", omega
+            print "done (compute_vel) = ", done
+        self.ros_interface.command_velocity(v, omega)
+        self.v_last = v
+        self.omega_last = omega
+
+        #print "v (compute_vel) = ", v
+        #print "omega (compute_vel) = ", omega
+        
+        return done
     
 def main(args):
     rospy.init_node('robot_control')
@@ -95,9 +105,10 @@ def main(args):
 
     # Call process_measurements at 60Hz
     r = rospy.Rate(1)
+    done = False
     #time = rospy.get_time() # used for calibration
-    while not rospy.is_shutdown():
-        robotControl.process_measurements()
+    while not rospy.is_shutdown() and not done:
+        done = robotControl.process_measurements()
 	# Calibration
 	# command robot forward at 0.3 m/s for 1 sec and measure how far it travels
 	#if rospy.get_time() - time < 1:

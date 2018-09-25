@@ -8,9 +8,9 @@ class DiffDriveController():
     """
     def __init__(self, max_speed, max_omega):
         # TODO for Student: Specify these parameters
-        self.kp=0.5 # 2 kp > 0
-        self.ka=3 # 10 ka > kp
-        self.kb=0 # 0 kb < 0
+        self.kp=0.4 # 2 kp > 0
+        self.ka=0.8 # 10 ka > kp
+        self.kb=-0.2 # 0 kb < 0
         self.MAX_SPEED = max_speed
         self.MAX_OMEGA = max_omega
         
@@ -30,13 +30,20 @@ class DiffDriveController():
         """
         # YOUR CODE HERE
         #pass
+        # ensure state and goal have the same dimensions
+        goal = goal.flatten()
+        #print("goal = ", goal)
+        #print("goal.shape = ", goal.shape)
+        #print("state = ", state)
+        #print("state.shape = ", state.shape)
 
         dx = goal[0] - state[0] # x displacement of tag measured at robot in meters
         dy = goal[1] - state[1] # y displacement of tag measured at robot in meters
         theta = state[2] # angle offset of robot X-axis to AprilTag X-axis
-	    
+        #print("dx = " + str(dx))
+        #print("type(dx) = " + str(type(dx)))
         rho = np.sqrt(dx*dx + dy*dy)
-        print "rho = " + str(rho)
+        #print "rho = " + str(rho)
         alpha = -theta + np.arctan2(dy,dx)
         beta = -theta - alpha
         done = False
